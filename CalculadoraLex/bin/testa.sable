@@ -1,0 +1,237 @@
+Package nonneuman;
+
+/***********************************************************
+DISCENTES: 
+201600016896 - JOÃO MANOEL SANTOS ALMEIDA
+201600017427 - JOÃO MARCELO DOS SANTOS NASCIMENTO
+
+Analisador Sintático Abstrato
+************************************************************/
+
+Helpers
+    digit = ['0'..'9'];
+    hex_digit = digit | ['a'..'f'] | ['A'..'F'];
+    letter = ['a'..'z'] | ['A'..'Z'];
+    space = ' ';
+    number = digit+;
+    hex_number = '0x' hex_digit+;
+    ht = 9;
+    nl = 10;
+    rc = 13;
+    dot = '.';
+    expo = 'E';
+    any_thing = ([0..9]* | [11..1794]*)*;
+
+Tokens
+	entry_point = 'entry';
+    const_id = 'const';
+    func_id = 'function';
+    if_id = 'if';
+    then_id = 'then';
+    else_id = 'else';
+    int_id = 'int';
+    bool_id = 'bool';
+    real_id = 'real';
+    lambda_id = 'lambda';
+
+    plus = '+';
+    minus = '-';
+    mult = '*';
+    div = '/';
+    mod = '%';
+    equals = '=';
+    g_than = '>';
+    l_than = '<';
+    not = '!';
+    and = 'and';
+    or = 'or';
+    colon = ':';
+    l_paren = '(';
+    r_paren = ')';
+    l_brac = '[';
+    r_brac = ']';
+    comma = ',';
+    bool_type = 'true' | 'false';
+    id = (letter | '_')+;
+    
+    int_type = number | hex_number;
+    real_type = '-'? (number dot number | number (dot number)? expo '-'? number);
+
+    blank = (space | rc | nl | ht)+;
+    comment_line = ';' any_thing nl?;
+    comment_block = '{-' (any_thing | nl*)+ '-}';
+
+Ignored Tokens
+	comment_line,comment_block,blank;
+	
+	
+Productions
+ 
+inicio {-> a_inicio} = 
+	{inicio} bloco_list main {-> New a_inicio.op1(bloco_list.a_bloco_list, main.a_main)}
+	| {inicio2} main bloco_list {-> New a_inicio.op2(main.a_main, bloco_list.a_bloco_list)}
+	| {main} main {-> New a_inicio.op3(main.a_main)}; 
+
+bloco {-> a_bloco} = 
+	{bloco} l_paren funcao r_paren {-> New a_bloco(l_paren, funcao.a_funcao, r_paren)};
+
+funcao {-> a_funcao} = 
+	{funcao} func_id type id  l_paren params_list r_paren retorno {-> New a_funcao.funcao(func_id, type.a_type, id,  l_paren, params_list.a_params_list, r_paren,  retorno.a_retorno)}
+	| {funcao2} func_id type id  l_paren r_paren retorno {-> New a_funcao.vazia(func_id, type.a_type, id,l_paren, r_paren, retorno.a_retorno)};
+
+retorno {-> a_retorno} = 
+	{retorno} [colon]:colon l_paren argumento r_paren {-> New a_retorno(colon,l_paren, argumento.a_argumento, r_paren )};
+
+chamada_func {-> a_chamada_func} = 
+	{chamada} id l_paren args_list r_paren {-> New a_chamada_func(id, l_paren, args_list.a_args_list, r_paren)};
+
+main {-> a_main} = 
+	{main} entry_point bloco {-> New a_main(entry_point, bloco.a_bloco)};
+
+funcao_list = {unica} [fun]:funcao
+ 	| {varias} [fun]:funcao [funcs]:funcao_list;
+ 
+bloco_list {-> a_bloco_list} = 
+	{unico} bloco {-> New a_bloco_list.unico(bloco.a_bloco)}
+	| {varios} bloco [blocos]:bloco_list {-> New a_bloco_list.varios(bloco.a_bloco, blocos.a_bloco_list)};
+	
+args_list {-> a_args_list} = 
+	{unico} argumento {-> New a_args_list.unico(argumento.a_argumento)}
+	| {varios} argumento comma [args]:args_list {-> New a_args_list.varios(argumento.a_argumento, comma, args.a_args_list )};
+	
+params_list {-> a_params_list} = 
+	{unico} parametro {-> New a_params_list.unico(parametro.a_parametro)}
+	| {varios} 	parametro comma [params]:params_list {-> New a_params_list.varios(parametro.a_parametro, comma, params.a_params_list)};
+	
+argumento {-> a_argumento} = 
+	{expr} expr {-> New a_argumento.expr(expr.a_expr)}
+	| {chamada} chamada_func {->  New a_argumento.chamada(chamada_func.a_chamada_func)}
+	| {condicional} condicional {-> New a_argumento.condicional(condicional.a_condicional)};
+		
+parametro {-> a_parametro} = 
+	{param} type id {-> New a_parametro.comum(type.a_type, id)}
+	| {funcalta} func_alta {-> New a_parametro.funcalta(func_alta.a_func_alta)};
+	
+expr {-> a_expr} =
+   {fator} fator {-> fator.a_expr}  
+  |{plus} expr plus fator {-> New a_expr.a_plus(expr.a_expr, fator.a_expr)} 
+  |{minus} expr minus fator {-> New a_expr.a_minus(expr.a_expr, fator.a_expr)};
+
+fator {-> a_expr} =
+   {termo} termo  {-> termo.a_expr}
+  |{mult} [esq]:fator mult [dir]:termo {-> New a_expr.a_mult(esq.a_expr, dir.a_expr)}
+  |{div}  [esq]:fator div [dir]:termo {-> New a_expr.a_div(esq.a_expr, dir.a_expr)} 
+  |{mod}  [esq]:fator mod [dir]:termo {-> New a_expr.a_mod(esq.a_expr, dir.a_expr)}; 
+ 
+  
+termo {-> a_expr} = 
+	{valor} valor {-> New a_expr.a_valor(valor.a_valor)} 
+  |{par} l_paren expr r_paren {-> expr.a_expr};
+  
+valor {-> a_valor} = 
+	{int} int_type {-> New a_valor.int(int_type)}
+	| {real} real_type {-> New a_valor.real(real_type)}
+	| {bool} bool_type {-> New a_valor.bool(bool_type)}
+	| {var} id {-> New a_valor.var(id)}; 
+
+type {-> a_type} = 	
+	{int} int_id {-> New a_type.int(int_id)}
+	| {bool} bool_id {-> New a_type.bool(bool_id)}
+    | {real} real_id {-> New a_type.real(real_id)};
+    
+type_list {-> a_type_list} =
+	{unico} type {-> New a_type_list.unico(type.a_type)}
+	| {varios} type comma [types]:type_list {-> New a_type_list.varios(type.a_type, comma, types.a_type_list)};
+    
+condicional {-> a_condicional} = 
+	{if} if_id condicao then_id expr {-> New a_condicional.if(if_id, condicao.a_condicao, then_id, expr.a_expr)}
+	| {ifelse} condicional else_id expr {-> New a_condicional.ifelse(condicional.a_condicional, else_id, expr.a_expr )};
+	
+condicao {-> a_condicao} = 
+	{bool} bool_type {-> New a_condicao.bool(bool_type)}
+	| {eq} valor igual {-> New a_condicao.eq(valor.a_valor, igual.a_igual)}
+	| {mq} valor maior {-> New a_condicao.mq(valor.a_valor, maior.a_maior)}
+	| {mn} valor menor {-> New a_condicao.mn(valor.a_valor, menor.a_menor)}
+	| {cond} l_paren condicao r_paren {-> New a_condicao.cond(l_paren, condicao.a_condicao, r_paren)};	
+	
+igual {-> a_igual} = {eq} equals valor {-> New a_igual(equals, valor.a_valor)};
+
+maior {-> a_maior} = {mq} g_than valor {-> New a_maior(g_than, valor.a_valor)};
+
+menor {-> a_menor} = {mn} l_than valor {-> New a_menor(l_than, valor.a_valor)};
+
+func_alta {-> a_func_alta} = 
+	type id l_paren type_list r_paren {-> New a_func_alta(type.a_type, id, l_paren, type_list.a_type_list, r_paren)};
+
+Abstract Syntax Tree
+
+a_inicio = {op1} a_bloco_list a_main
+	| {op2} a_main a_bloco_list
+	| {op3} a_main;
+
+a_bloco_list = {unico} a_bloco
+	| {varios} a_bloco [blocos]:a_bloco_list;
+	
+a_main = entry_point a_bloco;
+
+a_bloco = l_paren a_funcao r_paren;
+
+a_funcao = {funcao} func_id a_type id  l_paren a_params_list r_paren a_retorno
+	| {vazia} func_id a_type id  l_paren r_paren a_retorno;
+
+a_type = {int} int_id
+	| {bool} bool_id
+    | {real} real_id;
+    
+a_type_list =
+	{unico} a_type
+	| {varios} a_type comma [types]:a_type_list;
+    
+a_parametro = {comum} a_type id
+	| {funcalta} a_func_alta;
+
+a_params_list = {unico} a_parametro
+	| {varios} 	a_parametro comma [params]:a_params_list;
+
+a_retorno = colon l_paren a_argumento r_paren;
+
+a_argumento = {expr} a_expr
+	| {chamada} a_chamada_func
+	| {condicional} a_condicional;
+	
+a_args_list = {unico} a_argumento
+	| {varios} a_argumento comma [args]:a_args_list;
+	
+a_expr = {a_plus} [esq]:a_expr [dir]:a_expr
+     | {a_minus} [esq]:a_expr [dir]:a_expr
+     | {a_mult} [esq]:a_expr [dir]:a_expr
+     | {a_div} [esq]:a_expr [dir]:a_expr
+     | {a_mod} [esq]:a_expr [dir]:a_expr
+     | {a_valor} a_valor;
+     
+a_chamada_func = id l_paren a_args_list r_paren;
+
+a_condicional = {if} if_id a_condicao then_id a_expr
+	| {ifelse} a_condicional else_id a_expr;
+	
+a_condicao = {bool} bool_type
+	| {eq} a_valor a_igual
+	| {mq} a_valor a_maior
+	| {mn} a_valor a_menor
+	| {cond} l_paren a_condicao r_paren;
+	
+	
+a_valor = {int} int_type
+	| {real} real_type
+	| {bool} bool_type
+	| {var} id; 
+	
+a_igual = equals a_valor;
+
+a_maior = g_than a_valor;
+
+a_menor = l_than a_valor;
+
+a_func_alta = a_type id l_paren a_type_list r_paren;
+
+
